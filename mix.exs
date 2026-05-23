@@ -61,7 +61,7 @@ defmodule CircuitsFT232H.MixProject do
       {:ex_check, "~> 0.16", only: ~w[dev test]a, runtime: false},
       {:ex_doc, ">= 0.31.0", only: ~w[dev test]a, runtime: false},
       {:git_ops, "~> 2.6", only: ~w[dev test]a, runtime: false},
-      {:mimic, "~> 1.10", only: ~w[dev test]a, runtime: false}
+      {:mimic, "~> 2.0", only: ~w[dev test]a, runtime: false}
     ]
   end
 end
