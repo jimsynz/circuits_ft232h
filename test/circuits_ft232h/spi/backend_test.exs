@@ -3,7 +3,7 @@ defmodule CircuitsFT232H.SPI.BackendTest do
 
   alias CircuitsFT232H.SPI.Backend
 
-  @moduletag :hardware
+  @moduletag :hardware_spi
 
   setup do
     # The first call to Backend.open/2 starts the Device under the
