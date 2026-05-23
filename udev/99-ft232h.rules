@@ -1,0 +1,13 @@
+# Grant non-root access to the FT232H (Adafruit Breakout and similar) so that
+# `circuits_ft232h` can talk to the chip via libusb.
+#
+# Install with:
+#   sudo cp 99-ft232h.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+#
+# `uaccess` grants access to whoever is logged in at the local seat (no group
+# membership needed). The `plugdev` group fallback keeps things working over
+# SSH or for non-seat sessions, as long as your user is in that group.
+
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", MODE="0660", GROUP="plugdev", TAG+="uaccess"
