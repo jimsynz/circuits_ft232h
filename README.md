@@ -118,8 +118,8 @@ I2C requires:
 - **`D1` and `D2` jumpered together externally** — the FT232H drives SDA on
   `AD1` and samples it on `AD2`. Without the jumper, reads always come back
   as `0xFF`.
-- **External pull-ups on SCL and SDA.** Use 4.7&nbsp;kΩ for 100&nbsp;kHz
-  buses, 2.2&nbsp;kΩ for 400&nbsp;kHz, 1&nbsp;kΩ for 1&nbsp;MHz. The
+- **External pull-ups on SCL and SDA.** Use 4.7 kΩ for 100 kHz
+  buses, 2.2 kΩ for 400 kHz, 1 kΩ for 1 MHz. The
   FT232H's internal pull-ups are far too weak.
 
 ```elixir
@@ -166,7 +166,7 @@ Pull modes:
 `Circuits.GPIO.set_interrupts/3` is supported, but **be aware that the
 FT232H has no hardware-generated pin-change notifications**. We emulate
 interrupts by sampling pin state on a fixed interval — by default every
-10&nbsp;ms — and emitting `{:circuits_gpio, gpio_spec, timestamp, value}`
+10 ms — and emitting `{:circuits_gpio, gpio_spec, timestamp, value}`
 messages on edges.
 
 **Pulses shorter than the poll interval will be missed.** Multiple edges
@@ -180,7 +180,7 @@ config :circuits_ft232h, gpio_poll_interval_ms: 5
 ```
 
 Lower values reduce missable pulse width but use more USB bandwidth and
-CPU. Practical floor is ~2&nbsp;ms (USB round-trip latency). For fast
+CPU. Practical floor is ~2 ms (USB round-trip latency). For fast
 signals, use an actual microcontroller — this is a host-side development
 tool, not a real-time peripheral.
 

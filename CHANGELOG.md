@@ -34,7 +34,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   active I2C or SPI bus, rejecting opens on protocol-reserved pins.
 - `CircuitsFT232H.GPIO.Poller` — host-side polling GenServer that emulates
   GPIO interrupts. The FT232H has no hardware pin-change notifications;
-  pulses shorter than the poll interval (default 10&nbsp;ms) will be missed.
+  pulses shorter than the poll interval (default 10 ms) will be missed.
   Configurable via `config :circuits_ft232h, gpio_poll_interval_ms: N`.
 - FTDI serial number is read from the USB string descriptor at
   `list_devices/0` time, and used as the canonical chip id when present.

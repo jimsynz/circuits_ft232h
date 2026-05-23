@@ -9,7 +9,7 @@ defmodule CircuitsFT232H.GPIO.Poller do
   > `{:circuits_gpio, gpio_spec, timestamp, value}` messages when subscribed
   > pins change in the desired direction.
   >
-  > **Pulses shorter than the poll interval (default 10&nbsp;ms) will be
+  > **Pulses shorter than the poll interval (default 10 ms) will be
   > missed.** Multiple edges within a single interval are collapsed into one
   > notification with the final state.
 
@@ -17,21 +17,21 @@ defmodule CircuitsFT232H.GPIO.Poller do
   and registered in `CircuitsFT232H.Registry` under `{:poller, device_id}`.
   When the last subscription goes away the Poller stops itself.
 
-  Each poll tick is one USB round-trip (~1&nbsp;ms) that reads both the
+  Each poll tick is one USB round-trip (~1 ms) that reads both the
   ADBUS and ACBUS ports in a single MPSSE transaction. All subscribed pins
   on the chip are sampled together, so adding more subscribed pins does
   *not* increase USB load.
 
   ## Tuning the poll interval
 
-  The default interval is **10&nbsp;ms** (~100&nbsp;Hz sampling). To change
+  The default interval is **10 ms** (~100 Hz sampling). To change
   it:
 
       config :circuits_ft232h, gpio_poll_interval_ms: 5
 
   Lower values reduce the size of pulses you can miss but cost more USB
-  bandwidth and CPU. Practical floor is ~2&nbsp;ms (the USB round-trip
-  time). For mechanical buttons 10-20&nbsp;ms is plenty; for fast signals
+  bandwidth and CPU. Practical floor is ~2 ms (the USB round-trip
+  time). For mechanical buttons 10-20 ms is plenty; for fast signals
   you should look at an actual microcontroller.
 
   ## Other notes

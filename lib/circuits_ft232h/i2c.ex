@@ -21,8 +21,8 @@ defmodule CircuitsFT232H.I2C do
   | `ADBUS1` | SDA (out) — **must be tied externally to ADBUS2** |
   | `ADBUS2` | SDA (in)  — sees what's on the SDA wire |
 
-  External pull-ups on SCL and SDA are required: 4.7&nbsp;kΩ for 100&nbsp;kHz,
-  2.2&nbsp;kΩ for 400&nbsp;kHz, 1&nbsp;kΩ for 1&nbsp;MHz.
+  External pull-ups on SCL and SDA are required: 4.7 kΩ for 100 kHz,
+  2.2 kΩ for 400 kHz, 1 kΩ for 1 MHz.
 
   Public API lives on `CircuitsFT232H.I2C.Backend` and
   `CircuitsFT232H.I2C.Bus`. This module holds the shared MPSSE encoding

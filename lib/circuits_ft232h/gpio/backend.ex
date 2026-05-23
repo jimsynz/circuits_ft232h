@@ -22,7 +22,7 @@ defmodule CircuitsFT232H.GPIO.Backend do
   GenServer (`CircuitsFT232H.GPIO.Poller`) that samples pin state at a
   fixed interval — **the FT232H has no hardware pin-change notifications,
   so pulses shorter than the poll interval will be missed.** Default
-  interval is 10&nbsp;ms; configure via:
+  interval is 10 ms; configure via:
 
       config :circuits_ft232h, gpio_poll_interval_ms: 5
 

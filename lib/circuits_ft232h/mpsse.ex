@@ -98,14 +98,14 @@ defmodule CircuitsFT232H.MPSSE do
   # ----- Clocking -----
 
   @doc """
-  Selects the 60&nbsp;MHz MPSSE base clock (H-series chips only). Required
-  for SCK frequencies above 6&nbsp;MHz.
+  Selects the 60 MHz MPSSE base clock (H-series chips only). Required
+  for SCK frequencies above 6 MHz.
   """
   @spec disable_clock_divide_by_5() :: binary()
   def disable_clock_divide_by_5, do: <<@op_disable_clock_divide_by_5>>
 
   @doc """
-  Selects the legacy 12&nbsp;MHz MPSSE base clock (for compatibility with
+  Selects the legacy 12 MHz MPSSE base clock (for compatibility with
   FT2232D-style code).
   """
   @spec enable_clock_divide_by_5() :: binary()
@@ -138,8 +138,8 @@ defmodule CircuitsFT232H.MPSSE do
   Computes the MPSSE divisor that produces `target_hz` SCK, given the base
   clock.
 
-  Use `:high_speed` (default) for the 60&nbsp;MHz base (FT232H, requires
-  `disable_clock_divide_by_5/0`) and `:legacy` for the 12&nbsp;MHz base
+  Use `:high_speed` (default) for the 60 MHz base (FT232H, requires
+  `disable_clock_divide_by_5/0`) and `:legacy` for the 12 MHz base
   (FT2232D-compatible, requires `enable_clock_divide_by_5/0`).
 
   The formula is `SCK = base / ((1 + divisor) × 2)`. Result is rounded and

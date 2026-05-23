@@ -159,7 +159,7 @@ defmodule CircuitsFT232H.USB do
   Sets the chip's USB latency timer to `milliseconds` (1..255).
 
   Lower values give snappier reads at the cost of more USB traffic; MPSSE
-  applications typically use 1-16&nbsp;ms. The chip default is 16&nbsp;ms.
+  applications typically use 1-16 ms. The chip default is 16 ms.
   """
   @spec set_latency_timer(t(), 1..255, timeout()) :: :ok | {:error, term()}
   def set_latency_timer(%__MODULE__{} = usb, milliseconds, timeout \\ @default_timeout)
