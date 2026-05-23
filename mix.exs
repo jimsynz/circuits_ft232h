@@ -13,6 +13,7 @@ defmodule CircuitsFT232H.MixProject do
       description: @description,
       package: package(),
       deps: deps(),
+      dialyzer: [plt_add_apps: [:mix]],
       docs: docs(),
       elixirc_paths: elixirc_paths(Mix.env())
     ]
