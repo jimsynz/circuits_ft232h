@@ -52,6 +52,7 @@ defmodule CircuitsFT232H.MixProject do
       {:circuits_gpio, "~> 2.1"},
       {:circuits_i2c, "~> 2.1"},
       {:circuits_spi, "~> 2.0"},
+      {:igniter, "~> 0.8", optional: true},
       {:usb, "~> 0.2"},
       {:credo, "~> 1.7", only: ~w[dev test]a, runtime: false},
       {:dialyxir, "~> 1.4", only: ~w[dev test]a, runtime: false},

@@ -18,6 +18,15 @@ real hardware on the bus — no Raspberry Pi or Nerves target needed in the loop
 
 ## Quick start
 
+The fastest path is via [igniter](https://hex.pm/packages/igniter), which
+adds the dep and wires up `config/dev.exs` for you:
+
+```sh
+mix igniter.install circuits_ft232h
+```
+
+Or do it by hand:
+
 ```elixir
 # mix.exs
 def deps do
@@ -37,6 +46,11 @@ config :circuits_i2c, default_backend: CircuitsFT232H.I2C.Backend
 config :circuits_spi, default_backend: CircuitsFT232H.SPI.Backend
 config :circuits_gpio, default_backend: CircuitsFT232H.GPIO.Backend
 ```
+
+The installer only writes to `config/dev.exs` — the typical use case is
+swapping in the FT232H during development while production code runs
+against real targets. If you already have igniter in your project, you can
+also run `mix circuits_ft232h.install` directly after adding the dep.
 
 Then use the Circuits libraries as usual:
 
