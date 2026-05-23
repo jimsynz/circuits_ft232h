@@ -74,4 +74,28 @@ defmodule CircuitsFT232H.I2C.BackendTest do
     assert {:error, {:speed_too_high, _, _}} = Backend.open(name, speed_hz: 2_000_000)
     assert {:error, {:invalid_speed_hz, _}} = Backend.open(name, speed_hz: 0)
   end
+
+  describe "clock stretching" do
+    test "config carries clock_stretching: true through to the Bus struct", %{bus_name: name} do
+      {:ok, bus} = Backend.open(name, clock_stretching: true)
+      assert bus.config.clock_stretching == true
+      :ok = Circuits.I2C.close(bus)
+    end
+
+    test "claims AD7 so GPIO can't open it", %{bus_name: name} do
+      {:ok, bus} = Backend.open(name, clock_stretching: true)
+
+      assert {:error, {:pin_reserved_by_protocol, :i2c, 7}} =
+               CircuitsFT232H.GPIO.Backend.open("AD7", :output, [])
+
+      :ok = Circuits.I2C.close(bus)
+    end
+
+    test "doesn't claim AD7 when clock_stretching is off", %{bus_name: name} do
+      {:ok, bus} = Backend.open(name, [])
+      {:ok, handle} = CircuitsFT232H.GPIO.Backend.open("AD7", :output, [])
+      :ok = Circuits.GPIO.Handle.close(handle)
+      :ok = Circuits.I2C.close(bus)
+    end
+  end
 end

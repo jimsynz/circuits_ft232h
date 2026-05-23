@@ -35,7 +35,7 @@ defmodule CircuitsFT232H.I2C.Backend do
          {:ok, _pid} <- Device.find_or_start(descriptor),
          id = Device.id_for(descriptor),
          {:ok, config} <- I2C.build_config(opts),
-         :ok <- Device.claim_mode(id, :i2c),
+         :ok <- Device.claim_mode(id, :i2c, I2C.extra_reserved_pins(config)),
          :ok <- configure_or_release(id, config) do
       {:ok, %Bus{id: id, config: config}}
     end

@@ -131,11 +131,40 @@ Circuits.I2C.close(i2c)
 Supported I2C options:
 
 - `:speed_hz` (default 100 kHz, max 1 MHz).
+- `:clock_stretching` (default `false`) — see below.
 
 I2C transactions run at the requested bus rate via MPSSE 3-phase clocking
 (`ENABLE_DRIVE_ZERO` + `ENABLE_3_PHASE_CLOCKING` per FTDI AN_108). On every
 bus open, a 16-pulse bus-recovery sequence runs to free any slave stuck
 holding SDA low from a previous crashed program.
+
+#### Clock stretching
+
+I2C slaves are allowed to hold SCL low to make the master wait while they
+finish internal work (page writes, A/D conversions, etc.). MPSSE doesn't
+detect this natively — its clock generator just keeps running. We can fix
+this by reusing MPSSE's JTAG "adaptive clocking" feature: with `ADBUS0`
+(SCL) externally jumpered to `ADBUS7` (the `RTCK` pin), MPSSE can be told
+to pause its clock until `ADBUS7` actually reads high.
+
+Enable per bus:
+
+```elixir
+{:ok, i2c} = Circuits.I2C.open("ftdi-3:9-i2c", clock_stretching: true)
+```
+
+When `:clock_stretching` is `true`:
+
+- `ADBUS7` is reserved for the lifetime of the bus and rejected for GPIO opens.
+- Every I2C transaction is wrapped in `ENABLE_CLK_ADAPTIVE`/`DISABLE_CLK_ADAPTIVE`
+  opcodes, leaving the chip free between transactions.
+
+Wiring requirement: a wire jumpering `D0` (SCL) directly to `D7` (the silkscreen
+label corresponding to `ADBUS7`).
+
+Note: enabling clock stretching subtly changes the SCL waveform timing. A
+few well-behaved slaves with picky tolerances may NACK when adaptive clocking
+is on. If you only enable this for slaves that actually need it, you'll be fine.
 
 ### GPIO
 
@@ -228,11 +257,11 @@ Not yet supported.
 - **GPIO "interrupts" are emulated via host-side polling** (default 10 ms).
   Pulses shorter than the poll interval will be missed. See the GPIO
   section above.
+- **I2C clock stretching is opt-in** and requires an external jumper from
+  `D0` (SCL) to `D7`. See the I2C clock-stretching section above.
 - **FTDI serial numbers are read** on enumeration and used as the canonical
   chip id when programmed. Chips with a blank EEPROM fall back to
   `\"<bus>:<address>\"`, which is not stable across replugs.
-- **No I2C clock stretching** detection — pyftdi has an `AD7`-feedback trick
-  for this we haven't ported.
 - **`Circuits.I2C.write_read/5`** uses a repeated-start condition; some I2C
   peripherals (notably the Bosch BNO055) don't support repeated-start
   reliably. Use separate `write/4` + `read/4` calls for those devices.

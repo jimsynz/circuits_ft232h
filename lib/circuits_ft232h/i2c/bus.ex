@@ -19,12 +19,16 @@ defmodule CircuitsFT232H.I2C.Bus do
 
     def flags(%{config: %{flags: flags}}), do: flags
 
-    def read(%{id: id}, address, count, opts), do: I2C.read(id, address, count, opts)
+    def read(%{id: id, config: config}, address, count, opts) do
+      I2C.read(id, config, address, count, opts)
+    end
 
-    def write(%{id: id}, address, data, opts), do: I2C.write(id, address, data, opts)
+    def write(%{id: id, config: config}, address, data, opts) do
+      I2C.write(id, config, address, data, opts)
+    end
 
-    def write_read(%{id: id}, address, write_data, read_count, opts) do
-      I2C.write_read(id, address, write_data, read_count, opts)
+    def write_read(%{id: id, config: config}, address, write_data, read_count, opts) do
+      I2C.write_read(id, config, address, write_data, read_count, opts)
     end
 
     def close(%{id: id}), do: I2C.close(id)

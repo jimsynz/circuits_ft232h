@@ -37,6 +37,7 @@ defmodule CircuitsFT232H.MPSSE do
   @op_enable_clock_divide_by_5 0x8B
   @op_enable_3_phase_clocking 0x8C
   @op_disable_3_phase_clocking 0x8D
+  @op_enable_adaptive_clocking 0x96
   @op_disable_adaptive_clocking 0x97
   @op_enable_drive_zero 0x9E
 
@@ -122,9 +123,21 @@ defmodule CircuitsFT232H.MPSSE do
   @spec disable_3_phase_clocking() :: binary()
   def disable_3_phase_clocking, do: <<@op_disable_3_phase_clocking>>
 
-  @doc "Disables JTAG adaptive clocking. We never want it for I2C or SPI."
+  @doc "Disables adaptive clocking (the chip's default)."
   @spec disable_adaptive_clocking() :: binary()
   def disable_adaptive_clocking, do: <<@op_disable_adaptive_clocking>>
+
+  @doc """
+  Enables adaptive clocking — MPSSE pauses after each clock pulse until
+  `GPIOL3` (`ADBUS7`) is driven high.
+
+  Originally designed so MPSSE could synchronise with an ARM target's
+  `RTCK` signal, this gives a free clock-stretching mechanism for I2C if
+  `ADBUS0` (SCL) is externally jumpered to `ADBUS7`: the slave can hold
+  SCL low and MPSSE will wait for it.
+  """
+  @spec enable_adaptive_clocking() :: binary()
+  def enable_adaptive_clocking, do: <<@op_enable_adaptive_clocking>>
 
   @doc """
   Sets the SCK clock divisor. Get the right divisor via `clock_divisor/2`.

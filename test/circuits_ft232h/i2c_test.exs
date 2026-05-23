@@ -24,12 +24,25 @@ defmodule CircuitsFT232H.I2CTest do
 
   describe "build_config/1" do
     test "fills in defaults" do
-      assert {:ok, %{speed_hz: 100_000, flags: [:supports_empty_write]}} =
-               I2C.build_config([])
+      assert {:ok,
+              %{
+                speed_hz: 100_000,
+                clock_stretching: false,
+                flags: [:supports_empty_write]
+              }} = I2C.build_config([])
     end
 
     test "accepts a custom speed" do
       assert {:ok, %{speed_hz: 400_000}} = I2C.build_config(speed_hz: 400_000)
+    end
+
+    test "accepts clock_stretching: true" do
+      assert {:ok, %{clock_stretching: true}} = I2C.build_config(clock_stretching: true)
+    end
+
+    test "rejects non-boolean clock_stretching" do
+      assert {:error, {:invalid_clock_stretching, "yes"}} =
+               I2C.build_config(clock_stretching: "yes")
     end
 
     test "rejects non-positive speed" do
@@ -43,6 +56,16 @@ defmodule CircuitsFT232H.I2CTest do
 
     test "rejects non-integer speeds" do
       assert {:error, {:invalid_speed_hz, :fast}} = I2C.build_config(speed_hz: :fast)
+    end
+  end
+
+  describe "extra_reserved_pins/1" do
+    test "reserves AD7 when clock stretching is enabled" do
+      assert [7] = I2C.extra_reserved_pins(%{clock_stretching: true})
+    end
+
+    test "reserves no extra pins by default" do
+      assert [] = I2C.extra_reserved_pins(%{clock_stretching: false})
     end
   end
 end

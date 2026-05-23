@@ -59,6 +59,7 @@ defmodule CircuitsFT232H.Device do
           usb: CircuitsFT232H.USB.t() | nil,
           id: id() | nil,
           mode: mode(),
+          extra_reserved_pins: [pin()],
           adbus_value: byte(),
           adbus_dir: byte(),
           acbus_value: byte(),
@@ -69,6 +70,7 @@ defmodule CircuitsFT232H.Device do
   defstruct usb: nil,
             id: nil,
             mode: :none,
+            extra_reserved_pins: [],
             adbus_value: 0x00,
             adbus_dir: 0x00,
             acbus_value: 0x00,
@@ -173,11 +175,16 @@ defmodule CircuitsFT232H.Device do
   the requested mode), or `{:error, {:mode_busy, current_mode}}` otherwise.
   Also fails with `{:error, {:pin_busy, pin}}` if any currently-open GPIO
   pin would conflict with the new mode.
+
+  `extra_pins` lets a backend reserve additional pins beyond the protocol's
+  defaults — e.g. the I2C backend reserves `AD7` when clock stretching is
+  enabled, so a GPIO consumer can't grab the SCL-feedback pin.
   """
-  @spec claim_mode(id(), :i2c | :spi) ::
+  @spec claim_mode(id(), :i2c | :spi, [pin()]) ::
           :ok | {:error, {:mode_busy, mode()} | {:pin_busy, pin()}}
-  def claim_mode(id, requested) when requested in [:i2c, :spi] do
-    GenServer.call(via(id), {:claim_mode, requested})
+  def claim_mode(id, requested, extra_pins \\ [])
+      when requested in [:i2c, :spi] and is_list(extra_pins) do
+    GenServer.call(via(id), {:claim_mode, requested, extra_pins})
   end
 
   @doc "Releases whichever mode the chip is currently locked into."
@@ -318,23 +325,25 @@ defmodule CircuitsFT232H.Device do
   @impl true
   def handle_call(:mode, _from, state), do: {:reply, state.mode, state}
 
-  def handle_call({:claim_mode, mode}, _from, %{mode: :none} = state) do
-    case conflicting_gpio_pin(state, Map.fetch!(@protocol_pins, mode)) do
-      nil -> {:reply, :ok, %{state | mode: mode}}
+  def handle_call({:claim_mode, mode, extra}, _from, %{mode: :none} = state) do
+    reserved = Map.fetch!(@protocol_pins, mode) ++ extra
+
+    case conflicting_gpio_pin(state, reserved) do
+      nil -> {:reply, :ok, %{state | mode: mode, extra_reserved_pins: extra}}
       pin -> {:reply, {:error, {:pin_busy, pin}}, state}
     end
   end
 
-  def handle_call({:claim_mode, mode}, _from, %{mode: mode} = state) do
+  def handle_call({:claim_mode, mode, _extra}, _from, %{mode: mode} = state) do
     {:reply, :ok, state}
   end
 
-  def handle_call({:claim_mode, _requested}, _from, %{mode: current} = state) do
+  def handle_call({:claim_mode, _requested, _extra}, _from, %{mode: current} = state) do
     {:reply, {:error, {:mode_busy, current}}, state}
   end
 
   def handle_call(:release_mode, _from, state) do
-    {:reply, :ok, %{state | mode: :none}}
+    {:reply, :ok, %{state | mode: :none, extra_reserved_pins: []}}
   end
 
   def handle_call({:claim_gpio_pin, pin, direction, initial_value}, _from, state) do
@@ -342,7 +351,7 @@ defmodule CircuitsFT232H.Device do
       Map.has_key?(state.gpio_pins, pin) ->
         {:reply, {:error, {:pin_busy, pin}}, state}
 
-      pin in Map.fetch!(@protocol_pins, state.mode) ->
+      pin in Map.fetch!(@protocol_pins, state.mode) or pin in state.extra_reserved_pins ->
         {:reply, {:error, {:pin_reserved_by_protocol, state.mode, pin}}, state}
 
       true ->

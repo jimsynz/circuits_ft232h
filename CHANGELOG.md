@@ -41,12 +41,16 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   Chips with an unprogrammed EEPROM (or no permission to open the device
   during enumeration) fall back to `\"<bus>:<address>\"`. Stable ids mean
   bus names like `\"ftdi-<serial>-i2c\"` survive replugs.
+- I2C clock stretching support via MPSSE's adaptive clocking feature
+  (`ENABLE_CLK_ADAPTIVE` / `DISABLE_CLK_ADAPTIVE`). Opt in per bus with
+  `clock_stretching: true`; requires an external jumper from `ADBUS0`
+  (SCL) to `ADBUS7`. With it on, MPSSE pauses its clock whenever a slave
+  holds SCL low, and `AD7` is reserved against GPIO use.
 - `udev/99-ft232h.rules` shipped in-repo for non-root USB access on Linux.
 
 ### Known limitations
 
 - Windows is not yet supported.
-- I2C clock stretching is not detected.
 - SPI `:bits_per_word` is hardcoded to 8 and `:delay_us` is ignored.
 - `write_read/5` uses a repeated-start condition; some I2C peripherals (e.g.
   the Bosch BNO055) don't support repeated-start and need separate

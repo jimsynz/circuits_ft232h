@@ -42,7 +42,11 @@ defmodule CircuitsFT232H.I2C do
   @scl_bit 0x01
   @sda_o_bit 0x02
   @sda_i_bit 0x04
+  @scl_feedback_bit 0x80
+  @scl_feedback_pin 7
+
   @i2c_pins @scl_bit ||| @sda_o_bit ||| @sda_i_bit
+  @i2c_pins_with_feedback @i2c_pins ||| @scl_feedback_bit
 
   # Direction masks
   @drive_dir @scl_bit ||| @sda_o_bit
@@ -68,8 +72,20 @@ defmodule CircuitsFT232H.I2C do
   @typedoc "Resolved I2C bus configuration."
   @type config :: %{
           speed_hz: pos_integer(),
+          clock_stretching: boolean(),
           flags: [Circuits.I2C.Bus.flag()]
         }
+
+  @doc """
+  Returns the additional pins this backend reserves for a given config —
+  used by `CircuitsFT232H.I2C.Backend` when claiming the I2C mode lock.
+
+  With clock stretching enabled, `ADBUS7` (`AD7`) is reserved as the
+  SCL-feedback input.
+  """
+  @spec extra_reserved_pins(config()) :: [Device.pin()]
+  def extra_reserved_pins(%{clock_stretching: true}), do: [@scl_feedback_pin]
+  def extra_reserved_pins(_), do: []
 
   @doc "Builds the canonical I2C bus name for a device id."
   @spec bus_name(Device.id()) :: String.t()
@@ -104,10 +120,21 @@ defmodule CircuitsFT232H.I2C do
     end
   end
 
-  @doc "Validates and merges user options against the I2C defaults."
+  @doc """
+  Validates and merges user options against the I2C defaults.
+
+  Options:
+    * `:speed_hz` (default 100&nbsp;000, max 1&nbsp;000&nbsp;000)
+    * `:clock_stretching` (default `false`) — enable adaptive-clocking-based
+      I2C clock stretching detection. Requires `ADBUS0` (SCL) to be
+      externally jumpered to `ADBUS7` so MPSSE can see when a slave is
+      holding SCL low. Reserves `ADBUS7` (pin `AD7`) for the duration of
+      the bus.
+  """
   @spec build_config(keyword()) :: {:ok, config()} | {:error, term()}
   def build_config(opts) do
     speed_hz = Keyword.get(opts, :speed_hz, @default_speed_hz)
+    clock_stretching = Keyword.get(opts, :clock_stretching, false)
 
     cond do
       not is_integer(speed_hz) or speed_hz <= 0 ->
@@ -116,8 +143,16 @@ defmodule CircuitsFT232H.I2C do
       speed_hz > @max_speed_hz ->
         {:error, {:speed_too_high, speed_hz, @max_speed_hz}}
 
+      not is_boolean(clock_stretching) ->
+        {:error, {:invalid_clock_stretching, clock_stretching}}
+
       true ->
-        {:ok, %{speed_hz: speed_hz, flags: [:supports_empty_write]}}
+        {:ok,
+         %{
+           speed_hz: speed_hz,
+           clock_stretching: clock_stretching,
+           flags: [:supports_empty_write]
+         }}
     end
   end
 
@@ -133,11 +168,12 @@ defmodule CircuitsFT232H.I2C do
   def configure(id, config) do
     sck_target = round(config.speed_hz * 1.5)
     divisor = MPSSE.clock_divisor(sck_target)
+    drive_zero_mask = if config.clock_stretching, do: @i2c_pins_with_feedback, else: @i2c_pins
 
     setup =
       IO.iodata_to_binary([
         MPSSE.enable_3_phase_clocking(),
-        MPSSE.enable_drive_zero(@i2c_pins, 0x00),
+        MPSSE.enable_drive_zero(drive_zero_mask, 0x00),
         MPSSE.set_tck_divisor(divisor),
         bus_recovery_sequence(),
         MPSSE.set_bits_low(@both_high, @drive_dir)
@@ -179,9 +215,11 @@ defmodule CircuitsFT232H.I2C do
   # ----- Transactions -----
 
   @doc "Writes `data` to `address`. Empty `data` is the I2C device-present probe."
-  @spec write(Device.id(), 0..127, binary(), keyword()) :: :ok | {:error, term()}
-  def write(id, address, data, _opts \\ []) when address in 0..127 and is_binary(data) do
-    {command, expected} = build_write(address, data)
+  @spec write(Device.id(), config(), 0..127, binary(), keyword()) ::
+          :ok | {:error, term()}
+  def write(id, config, address, data, _opts \\ [])
+      when address in 0..127 and is_binary(data) do
+    {command, expected} = build_write(address, data, config)
 
     with {:ok, response} <- Device.transaction(id, command, expected, @default_timeout) do
       check_write_response(response, byte_size(data))
@@ -189,10 +227,11 @@ defmodule CircuitsFT232H.I2C do
   end
 
   @doc "Reads `count` bytes from `address`."
-  @spec read(Device.id(), 0..127, pos_integer(), keyword()) ::
+  @spec read(Device.id(), config(), 0..127, pos_integer(), keyword()) ::
           {:ok, binary()} | {:error, term()}
-  def read(id, address, count, _opts \\ []) when address in 0..127 and count > 0 do
-    {command, expected} = build_read(address, count)
+  def read(id, config, address, count, _opts \\ [])
+      when address in 0..127 and count > 0 do
+    {command, expected} = build_read(address, count, config)
 
     with {:ok, response} <- Device.transaction(id, command, expected, @default_timeout) do
       check_read_response(response, count)
@@ -200,11 +239,11 @@ defmodule CircuitsFT232H.I2C do
   end
 
   @doc "Writes `write_data` then reads `read_count` bytes, with a repeated start in between."
-  @spec write_read(Device.id(), 0..127, binary(), pos_integer(), keyword()) ::
+  @spec write_read(Device.id(), config(), 0..127, binary(), pos_integer(), keyword()) ::
           {:ok, binary()} | {:error, term()}
-  def write_read(id, address, write_data, read_count, _opts \\ [])
+  def write_read(id, config, address, write_data, read_count, _opts \\ [])
       when address in 0..127 and is_binary(write_data) and read_count > 0 do
-    {command, expected} = build_write_read(address, write_data, read_count)
+    {command, expected} = build_write_read(address, write_data, read_count, config)
 
     with {:ok, response} <- Device.transaction(id, command, expected, @default_timeout) do
       check_write_read_response(response, byte_size(write_data), read_count)
@@ -213,54 +252,69 @@ defmodule CircuitsFT232H.I2C do
 
   # ----- Sequence builders -----
 
-  defp build_write(address, data) do
+  defp build_write(address, data, config) do
     bytes = <<address <<< 1>> <> data
 
     command =
-      IO.iodata_to_binary([
+      wrap_transaction(config, [
         start_sequence(),
         write_bytes_with_acks(bytes),
-        stop_sequence(),
-        MPSSE.send_immediate()
+        stop_sequence()
       ])
 
     # One ACK byte per byte written, including the address byte.
     {command, byte_size(bytes)}
   end
 
-  defp build_read(address, count) do
+  defp build_read(address, count, config) do
     address_byte = <<address <<< 1 ||| 1>>
 
     command =
-      IO.iodata_to_binary([
+      wrap_transaction(config, [
         start_sequence(),
         write_bytes_with_acks(address_byte),
         read_bytes_with_acks(count),
-        stop_sequence(),
-        MPSSE.send_immediate()
+        stop_sequence()
       ])
 
     # 1 ACK byte (address) + `count` data bytes.
     {command, 1 + count}
   end
 
-  defp build_write_read(address, write_data, read_count) do
+  defp build_write_read(address, write_data, read_count, config) do
     write_bytes = <<address <<< 1>> <> write_data
     read_address = <<address <<< 1 ||| 1>>
 
     command =
-      IO.iodata_to_binary([
+      wrap_transaction(config, [
         start_sequence(),
         write_bytes_with_acks(write_bytes),
         repeated_start_sequence(),
         write_bytes_with_acks(read_address),
         read_bytes_with_acks(read_count),
-        stop_sequence(),
-        MPSSE.send_immediate()
+        stop_sequence()
       ])
 
     # ACKs: write address + write data + read address. Data: read_count.
     {command, byte_size(write_bytes) + 1 + read_count}
+  end
+
+  # Wraps a transaction body in adaptive-clocking enable/disable opcodes when
+  # the config asks for clock stretching. Pyftdi does the same per-transaction
+  # — adaptive clocking is left off between transactions so other operations
+  # (e.g. GPIO reads through `CircuitsFT232H.Device.read_gpio_bytes/1`) don't
+  # wait on the AD7 feedback pin.
+  defp wrap_transaction(%{clock_stretching: true}, body) do
+    IO.iodata_to_binary([
+      MPSSE.enable_adaptive_clocking(),
+      body,
+      MPSSE.disable_adaptive_clocking(),
+      MPSSE.send_immediate()
+    ])
+  end
+
+  defp wrap_transaction(_config, body) do
+    IO.iodata_to_binary([body, MPSSE.send_immediate()])
   end
 
   # ----- MPSSE primitives -----
