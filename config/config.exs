@@ -1,5 +1,9 @@
 import Config
 
+if Mix.env() == :dev do
+  config :circuits_i2c, default_backend: CircuitsFT232H.I2C.Backend
+end
+
 config :git_ops,
   mix_project: Mix.Project.get!(),
   changelog_file: "CHANGELOG.md",
