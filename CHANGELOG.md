@@ -32,6 +32,10 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 - `CircuitsFT232H.GPIO.Backend` — `Circuits.GPIO.Backend` implementation.
   Exposes all 16 GPIO pins (`AD0`-`AD7`, `AC0`-`AC7`) and coexists with an
   active I2C or SPI bus, rejecting opens on protocol-reserved pins.
+- `CircuitsFT232H.GPIO.Poller` — host-side polling GenServer that emulates
+  GPIO interrupts. The FT232H has no hardware pin-change notifications;
+  pulses shorter than the poll interval (default 10&nbsp;ms) will be missed.
+  Configurable via `config :circuits_ft232h, gpio_poll_interval_ms: N`.
 - `udev/99-ft232h.rules` shipped in-repo for non-root USB access on Linux.
 
 ### Known limitations

@@ -48,8 +48,18 @@ defmodule CircuitsFT232H.GPIO.Handle do
 
     def set_pull_mode(_handle, _mode), do: {:error, :not_supported}
 
-    def close(%{controller: id, pin: pin}), do: Device.release_gpio_pin(id, pin)
+    def close(%{controller: id, pin: pin}) do
+      _ = CircuitsFT232H.GPIO.Poller.unsubscribe(id, pin)
+      Device.release_gpio_pin(id, pin)
+    end
 
-    def set_interrupts(_handle, _trigger, _opts), do: {:error, :not_supported}
+    def set_interrupts(%{controller: id, pin: pin}, :none, _opts) do
+      CircuitsFT232H.GPIO.Poller.unsubscribe(id, pin)
+    end
+
+    def set_interrupts(%{controller: id, pin: pin}, trigger, opts)
+        when trigger in [:rising, :falling, :both] do
+      CircuitsFT232H.GPIO.Poller.subscribe(id, pin, trigger, opts)
+    end
   end
 end

@@ -16,8 +16,17 @@ defmodule CircuitsFT232H.GPIO.Backend do
   active protocol fail with `{:error, {:pin_reserved_by_protocol, mode, pin}}`
   if you try to open them as GPIO.
 
-  Interrupt support is not yet implemented; `Circuits.GPIO.set_interrupts/3`
-  returns `{:error, :not_supported}`.
+  ## Interrupts are emulated by polling
+
+  `Circuits.GPIO.set_interrupts/3` is supported via a per-chip polling
+  GenServer (`CircuitsFT232H.GPIO.Poller`) that samples pin state at a
+  fixed interval — **the FT232H has no hardware pin-change notifications,
+  so pulses shorter than the poll interval will be missed.** Default
+  interval is 10&nbsp;ms; configure via:
+
+      config :circuits_ft232h, gpio_poll_interval_ms: 5
+
+  See `CircuitsFT232H.GPIO.Poller` for the full caveats.
   """
 
   @behaviour Circuits.GPIO.Backend

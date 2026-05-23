@@ -241,6 +241,14 @@ defmodule CircuitsFT232H.Device do
     GenServer.call(via(id), {:gpio_pin_direction, pin})
   end
 
+  @doc """
+  Reads the current state of the low-byte (ADBUS0..7) and high-byte
+  (ACBUS0..7) ports in a single USB round-trip. Used by the GPIO poller to
+  detect edges across many pins without paying per-pin latency.
+  """
+  @spec read_gpio_bytes(id()) :: {:ok, {byte(), byte()}} | {:error, term()}
+  def read_gpio_bytes(id), do: GenServer.call(via(id), :read_gpio_bytes)
+
   # ----- Transactions -----
 
   @doc """
@@ -386,6 +394,23 @@ defmodule CircuitsFT232H.Device do
 
   def handle_call({:gpio_pin_direction, pin}, _from, state) do
     {:reply, Map.get(state.gpio_pins, pin), state}
+  end
+
+  def handle_call(:read_gpio_bytes, _from, state) do
+    command =
+      IO.iodata_to_binary([
+        MPSSE.get_bits_low(),
+        MPSSE.get_bits_high(),
+        MPSSE.send_immediate()
+      ])
+
+    result =
+      with :ok <- USB.write(state.usb, command),
+           {:ok, <<low, high>>} <- USB.read(state.usb, 2) do
+        {:ok, {low, high}}
+      end
+
+    {:reply, result, state}
   end
 
   def handle_call({:set_gpio_pin_direction, pin, direction}, _from, state) do

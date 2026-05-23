@@ -161,9 +161,30 @@ Pull modes:
 - `:pulldown` and `:none` return `{:error, :not_supported}` — neither is
   controllable at runtime.
 
-Interrupts (`Circuits.GPIO.set_interrupts/3`) return `:not_supported`. The
-FT232H has no hardware-generated pin-change notifications; a polling-based
-implementation is on the to-do list.
+#### GPIO interrupts are emulated
+
+`Circuits.GPIO.set_interrupts/3` is supported, but **be aware that the
+FT232H has no hardware-generated pin-change notifications**. We emulate
+interrupts by sampling pin state on a fixed interval — by default every
+10&nbsp;ms — and emitting `{:circuits_gpio, gpio_spec, timestamp, value}`
+messages on edges.
+
+**Pulses shorter than the poll interval will be missed.** Multiple edges
+within a single interval are collapsed into one notification with the final
+state. Edge detection is purely host-side polling, not chip hardware.
+
+Configure the poll interval with:
+
+```elixir
+config :circuits_ft232h, gpio_poll_interval_ms: 5
+```
+
+Lower values reduce missable pulse width but use more USB bandwidth and
+CPU. Practical floor is ~2&nbsp;ms (USB round-trip latency). For fast
+signals, use an actual microcontroller — this is a host-side development
+tool, not a real-time peripheral.
+
+`:suppress_glitches` is accepted but currently a no-op.
 
 ## Installation
 
@@ -204,7 +225,9 @@ Not yet supported.
 ## Limitations
 
 - **No Windows support** yet.
-- **No GPIO interrupts** — polling-based implementation pending.
+- **GPIO "interrupts" are emulated via host-side polling** (default 10 ms).
+  Pulses shorter than the poll interval will be missed. See the GPIO
+  section above.
 - **No FTDI serial number reading** — multiple chips are identified by their
   USB bus and address, which changes across replugs.
 - **No I2C clock stretching** detection — pyftdi has an `AD7`-feedback trick

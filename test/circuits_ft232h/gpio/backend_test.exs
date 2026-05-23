@@ -95,11 +95,11 @@ defmodule CircuitsFT232H.GPIO.BackendTest do
   end
 
   describe "interrupts" do
-    test "set_interrupts/3 returns :not_supported" do
+    test "set_interrupts/3 subscribes via the Poller and returns :ok" do
       {:ok, handle} = Backend.open("AC0", :input, [])
 
-      assert {:error, :not_supported} =
-               Circuits.GPIO.Handle.set_interrupts(handle, :both, [])
+      assert :ok = Circuits.GPIO.Handle.set_interrupts(handle, :both, [])
+      assert :ok = Circuits.GPIO.Handle.set_interrupts(handle, :none, [])
 
       :ok = Circuits.GPIO.Handle.close(handle)
     end
