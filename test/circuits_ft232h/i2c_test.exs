@@ -57,6 +57,20 @@ defmodule CircuitsFT232H.I2CTest do
     test "rejects non-integer speeds" do
       assert {:error, {:invalid_speed_hz, :fast}} = I2C.build_config(speed_hz: :fast)
     end
+
+    test "derives hold_repeats from speed_hz" do
+      assert {:ok, %{hold_repeats: slow}} = I2C.build_config(speed_hz: 100_000)
+      assert {:ok, %{hold_repeats: medium}} = I2C.build_config(speed_hz: 400_000)
+      assert {:ok, %{hold_repeats: fast}} = I2C.build_config(speed_hz: 1_000_000)
+
+      assert slow > medium
+      assert medium > fast
+    end
+
+    test "floors hold_repeats so even fast speeds get enough margin" do
+      assert {:ok, %{hold_repeats: n}} = I2C.build_config(speed_hz: 1_000_000)
+      assert n >= 4
+    end
   end
 
   describe "extra_reserved_pins/1" do

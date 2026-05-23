@@ -13,4 +13,5 @@ jobs:
     with:
       git_ops_enabled: false
       hex_release_enabled: true
+      extra_packages: "libusb-1.0-0-dev"
     secrets: inherit

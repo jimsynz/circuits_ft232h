@@ -69,10 +69,17 @@ defmodule CircuitsFT232H.I2C do
   @ack_byte 0x00
   @nack_byte 0xFF
 
+  # MPSSE processes a 3-byte set_bits_low opcode in ~208 ns on the FT232H's
+  # 60 MHz engine (calibrated against an INA219 at 100 kHz — 24 repeats
+  # gave the ~5 μs hold needed to satisfy I²C tHD;STA/tSU;STA/tHIGH/tLOW).
+  @ns_per_hold_rep 208
+  @min_hold_repeats 4
+
   @typedoc "Resolved I2C bus configuration."
   @type config :: %{
           speed_hz: pos_integer(),
           clock_stretching: boolean(),
+          hold_repeats: pos_integer(),
           flags: [Circuits.I2C.Bus.flag()]
         }
 
@@ -151,9 +158,19 @@ defmodule CircuitsFT232H.I2C do
          %{
            speed_hz: speed_hz,
            clock_stretching: clock_stretching,
+           hold_repeats: hold_repeats_for(speed_hz),
            flags: [:supports_empty_write]
          }}
     end
+  end
+
+  # Number of times each bus-control set_bits_low is repeated in start/stop/
+  # repeated-start sequences to give the slave enough setup/hold time. Targets
+  # a half-SCL-period hold so we comfortably meet the I²C spec's minima
+  # (tHD;STA/tSU;STA/tSU;STO of 4 μs / 0.6 μs / 0.26 μs at 100k / 400k / 1M).
+  defp hold_repeats_for(speed_hz) do
+    target_ns = div(1_000_000_000, 2 * speed_hz)
+    max(@min_hold_repeats, div(target_ns + @ns_per_hold_rep - 1, @ns_per_hold_rep))
   end
 
   @doc """
@@ -175,23 +192,23 @@ defmodule CircuitsFT232H.I2C do
         MPSSE.enable_3_phase_clocking(),
         MPSSE.enable_drive_zero(drive_zero_mask, 0x00),
         MPSSE.set_tck_divisor(divisor),
-        bus_recovery_sequence(),
+        bus_recovery_sequence(config),
         MPSSE.set_bits_low(@both_high, @drive_dir)
       ])
 
     Device.transaction(id, setup)
   end
 
-  defp bus_recovery_sequence do
+  defp bus_recovery_sequence(config) do
     pulses =
       for _ <- 1..16 do
         [
-          MPSSE.set_bits_low(@both_high, @drive_dir),
-          MPSSE.set_bits_low(@scl_low_sda_high, @drive_dir)
+          hold(@both_high, @drive_dir, config),
+          hold(@scl_low_sda_high, @drive_dir, config)
         ]
       end
 
-    [pulses, stop_sequence()]
+    [pulses, stop_sequence(config)]
   end
 
   @doc """
@@ -257,9 +274,9 @@ defmodule CircuitsFT232H.I2C do
 
     command =
       wrap_transaction(config, [
-        start_sequence(),
+        start_sequence(config),
         write_bytes_with_acks(bytes),
-        stop_sequence()
+        stop_sequence(config)
       ])
 
     # One ACK byte per byte written, including the address byte.
@@ -271,10 +288,10 @@ defmodule CircuitsFT232H.I2C do
 
     command =
       wrap_transaction(config, [
-        start_sequence(),
+        start_sequence(config),
         write_bytes_with_acks(address_byte),
         read_bytes_with_acks(count),
-        stop_sequence()
+        stop_sequence(config)
       ])
 
     # 1 ACK byte (address) + `count` data bytes.
@@ -287,12 +304,12 @@ defmodule CircuitsFT232H.I2C do
 
     command =
       wrap_transaction(config, [
-        start_sequence(),
+        start_sequence(config),
         write_bytes_with_acks(write_bytes),
-        repeated_start_sequence(),
+        repeated_start_sequence(config),
         write_bytes_with_acks(read_address),
         read_bytes_with_acks(read_count),
-        stop_sequence()
+        stop_sequence(config)
       ])
 
     # ACKs: write address + write data + read address. Data: read_count.
@@ -319,28 +336,37 @@ defmodule CircuitsFT232H.I2C do
 
   # ----- MPSSE primitives -----
 
-  defp start_sequence do
+  # set_bits_low executes at the MPSSE engine rate (~200 ns per opcode),
+  # which is far faster than I²C standard-mode setup/hold times (~5 μs).
+  # Each control-line transition in start/stop/repeated-start needs to hold
+  # its state long enough for the slave to register the edge, so each state
+  # is emitted `config.hold_repeats` times to consume time without changing
+  # the bus. The count is derived from the bus speed in `build_config/1`.
+  defp hold(state, direction, %{hold_repeats: n}),
+    do: List.duplicate(MPSSE.set_bits_low(state, direction), n)
+
+  defp start_sequence(config) do
     [
-      MPSSE.set_bits_low(@both_high, @drive_dir),
-      MPSSE.set_bits_low(@scl_high_sda_low, @drive_dir),
-      MPSSE.set_bits_low(@scl_low_sda_low, @drive_dir)
+      hold(@both_high, @drive_dir, config),
+      hold(@scl_high_sda_low, @drive_dir, config),
+      hold(@scl_low_sda_low, @drive_dir, config)
     ]
   end
 
-  defp stop_sequence do
+  defp stop_sequence(config) do
     [
-      MPSSE.set_bits_low(@scl_low_sda_low, @drive_dir),
-      MPSSE.set_bits_low(@scl_high_sda_low, @drive_dir),
-      MPSSE.set_bits_low(@both_high, @drive_dir)
+      hold(@scl_low_sda_low, @drive_dir, config),
+      hold(@scl_high_sda_low, @drive_dir, config),
+      hold(@both_high, @drive_dir, config)
     ]
   end
 
-  defp repeated_start_sequence do
+  defp repeated_start_sequence(config) do
     [
-      MPSSE.set_bits_low(@scl_low_sda_high, @drive_dir),
-      MPSSE.set_bits_low(@both_high, @drive_dir),
-      MPSSE.set_bits_low(@scl_high_sda_low, @drive_dir),
-      MPSSE.set_bits_low(@scl_low_sda_low, @drive_dir)
+      hold(@scl_low_sda_high, @drive_dir, config),
+      hold(@both_high, @drive_dir, config),
+      hold(@scl_high_sda_low, @drive_dir, config),
+      hold(@scl_low_sda_low, @drive_dir, config)
     ]
   end
 
