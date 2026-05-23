@@ -27,6 +27,12 @@ defmodule CircuitsFT232H.USB do
   # bmRequestType byte for FTDI vendor requests (host-to-device)
   @request_type_out 0x40
 
+  # bmRequestType + bRequest for the standard GET_DESCRIPTOR request used to
+  # read string descriptors (manufacturer, product, serial number).
+  @request_type_in_standard 0x80
+  @standard_request_get_descriptor 0x06
+  @string_descriptor_type 0x03
+
   # FTDI SIO request opcodes (FTDI AN_232B-04)
   @sio_request_reset 0x00
   @sio_request_set_event_char 0x06
@@ -316,14 +322,106 @@ defmodule CircuitsFT232H.USB do
     {:ok, address} = :usb.get_device_address(device)
     port_numbers = unwrap(:usb.get_port_numbers(device), [])
     speed = unwrap(:usb.get_device_speed(device), :unknown)
+    serial = read_device_serial(device)
 
     %Descriptor{
       device: device,
       bus: bus,
       address: address,
+      serial: serial,
       port_numbers: port_numbers,
       speed: speed
     }
+  end
+
+  defp read_device_serial(device) do
+    with {:ok, %{serial_number_string_index: index}} when index > 0 <-
+           :usb.get_device_descriptor(device),
+         {:ok, string} <- read_string_descriptor(device, index) do
+      string
+    else
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Reads a USB string descriptor at the given index.
+
+  Used for retrieving the FTDI serial number, manufacturer string, or
+  product string. The first call reads the supported language IDs (index
+  0), then re-reads at the requested index in the first language.
+
+  Most failures are normal: `:access` if the udev rule isn't installed,
+  `:invalid_descriptor` if the chip has no programmed string at that index
+  (common for FT232Hs whose EEPROM hasn't been written).
+  """
+  @spec read_string_descriptor(:usb.device(), 1..255) ::
+          {:ok, String.t()} | {:error, term()}
+  def read_string_descriptor(device, index) when index in 1..255 do
+    with {:ok, handle} <- :usb.open_device(device) do
+      try do
+        with {:ok, lang} <- read_first_language_id(handle),
+             {:ok, raw} <- get_string_descriptor(handle, index, lang) do
+          decode_string_descriptor(raw)
+        end
+      after
+        _ = :usb.close_device(handle)
+      end
+    end
+  end
+
+  @doc """
+  Decodes a raw USB string descriptor binary into an Elixir string.
+
+  The on-wire format is `<<length, 0x03, utf16_le_bytes::binary>>`. Returns
+  `{:error, :invalid_descriptor}` if the input doesn't fit that shape
+  (typical when the chip returns `0xFF`-filled garbage for an unprogrammed
+  string), and `{:error, :invalid_utf16}` if the bytes after the header
+  don't decode as UTF-16LE.
+  """
+  @spec decode_string_descriptor(binary()) :: {:ok, String.t()} | {:error, term()}
+  def decode_string_descriptor(<<len, @string_descriptor_type, payload::binary>>)
+      when len >= 2 and byte_size(payload) >= len - 2 do
+    utf16 = binary_part(payload, 0, len - 2)
+
+    case :unicode.characters_to_binary(utf16, {:utf16, :little}) do
+      string when is_binary(string) -> {:ok, string}
+      _ -> {:error, :invalid_utf16}
+    end
+  end
+
+  def decode_string_descriptor(_), do: {:error, :invalid_descriptor}
+
+  defp read_first_language_id(handle) do
+    value = Bitwise.bsl(@string_descriptor_type, 8)
+
+    case :usb.read_control(
+           handle,
+           @request_type_in_standard,
+           @standard_request_get_descriptor,
+           value,
+           0,
+           255,
+           @default_timeout
+         ) do
+      {:ok, <<_len, _type, lang::little-16, _::binary>>} -> {:ok, lang}
+      {:ok, _} -> {:error, :no_languages}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp get_string_descriptor(handle, index, lang) do
+    value = Bitwise.bor(Bitwise.bsl(@string_descriptor_type, 8), index)
+
+    :usb.read_control(
+      handle,
+      @request_type_in_standard,
+      @standard_request_get_descriptor,
+      value,
+      lang,
+      255,
+      @default_timeout
+    )
   end
 
   defp unwrap({:ok, value}, _default), do: value

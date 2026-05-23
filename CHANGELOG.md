@@ -36,15 +36,16 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   GPIO interrupts. The FT232H has no hardware pin-change notifications;
   pulses shorter than the poll interval (default 10&nbsp;ms) will be missed.
   Configurable via `config :circuits_ft232h, gpio_poll_interval_ms: N`.
+- FTDI serial number is read from the USB string descriptor at
+  `list_devices/0` time, and used as the canonical chip id when present.
+  Chips with an unprogrammed EEPROM (or no permission to open the device
+  during enumeration) fall back to `\"<bus>:<address>\"`. Stable ids mean
+  bus names like `\"ftdi-<serial>-i2c\"` survive replugs.
 - `udev/99-ft232h.rules` shipped in-repo for non-root USB access on Linux.
 
 ### Known limitations
 
 - Windows is not yet supported.
-- GPIO interrupts are not supported (the FT232H has no hardware pin-change
-  notifications; a polling implementation is planned).
-- FTDI serial numbers aren't read yet; chips are identified by `bus:address`
-  which changes across replugs.
 - I2C clock stretching is not detected.
 - SPI `:bits_per_word` is hardcoded to 8 and `:delay_us` is ignored.
 - `write_read/5` uses a repeated-start condition; some I2C peripherals (e.g.

@@ -33,8 +33,12 @@ defmodule CircuitsFT232H.Device do
   @default_timeout 5_000
 
   @typedoc """
-  Canonical identifier for a physical FT232H. Today this is `\"<bus>:<address>\"`;
-  in a later iteration it will be the FTDI serial number string.
+  Canonical identifier for a physical FT232H.
+
+  Prefers the chip's FTDI-programmed serial number string when one is
+  available (so the id is stable across replugs). Falls back to
+  `\"<bus>:<address>\"` if the chip has no serial or it couldn't be read
+  (e.g. permission denied).
   """
   @type id :: String.t()
 
@@ -85,6 +89,7 @@ defmodule CircuitsFT232H.Device do
 
   @doc "Returns the canonical id for a USB descriptor."
   @spec id_for(Descriptor.t()) :: id()
+  def id_for(%Descriptor{serial: serial}) when is_binary(serial) and serial != "", do: serial
   def id_for(%Descriptor{bus: bus, address: address}), do: "#{bus}:#{address}"
 
   @doc """

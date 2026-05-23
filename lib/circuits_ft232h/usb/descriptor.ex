@@ -8,12 +8,13 @@ defmodule CircuitsFT232H.USB.Descriptor do
   """
 
   @enforce_keys [:device, :bus, :address]
-  defstruct [:device, :bus, :address, port_numbers: [], speed: :unknown]
+  defstruct [:device, :bus, :address, :serial, port_numbers: [], speed: :unknown]
 
   @type t :: %__MODULE__{
           device: :usb.device(),
           bus: 0..255,
           address: 0..255,
+          serial: String.t() | nil,
           port_numbers: [0..255],
           speed: :unknown | :low | :full | :high | :super | :super_plus
         }

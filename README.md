@@ -228,8 +228,9 @@ Not yet supported.
 - **GPIO "interrupts" are emulated via host-side polling** (default 10 ms).
   Pulses shorter than the poll interval will be missed. See the GPIO
   section above.
-- **No FTDI serial number reading** — multiple chips are identified by their
-  USB bus and address, which changes across replugs.
+- **FTDI serial numbers are read** on enumeration and used as the canonical
+  chip id when programmed. Chips with a blank EEPROM fall back to
+  `\"<bus>:<address>\"`, which is not stable across replugs.
 - **No I2C clock stretching** detection — pyftdi has an `AD7`-feedback trick
   for this we haven't ported.
 - **`Circuits.I2C.write_read/5`** uses a repeated-start condition; some I2C

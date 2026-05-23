@@ -3,6 +3,46 @@ defmodule CircuitsFT232H.USBTest do
 
   alias CircuitsFT232H.USB
 
+  describe "decode_string_descriptor/1" do
+    test "decodes a well-formed UTF-16LE string descriptor" do
+      # Header: length=14, type=0x03; payload: "FT232H" in UTF-16LE
+      utf16 = :unicode.characters_to_binary("FT232H", :utf8, {:utf16, :little})
+      raw = <<byte_size(utf16) + 2, 0x03, utf16::binary>>
+
+      assert {:ok, "FT232H"} = USB.decode_string_descriptor(raw)
+    end
+
+    test "ignores trailing bytes past the declared length" do
+      utf16 = :unicode.characters_to_binary("AB", :utf8, {:utf16, :little})
+      raw = <<6, 0x03, utf16::binary, 0xFF, 0xFF, 0xFF>>
+
+      assert {:ok, "AB"} = USB.decode_string_descriptor(raw)
+    end
+
+    test "decodes an empty string when length is 2" do
+      assert {:ok, ""} = USB.decode_string_descriptor(<<2, 0x03>>)
+    end
+
+    test "rejects descriptors that aren't a string-descriptor type" do
+      # type byte 0x01 = DEVICE descriptor, not 0x03
+      assert {:error, :invalid_descriptor} = USB.decode_string_descriptor(<<4, 0x01, 0x09, 0x04>>)
+    end
+
+    test "rejects 0xFF-filled garbage from an unprogrammed EEPROM" do
+      assert {:error, :invalid_descriptor} =
+               USB.decode_string_descriptor(:binary.copy(<<0xFF>>, 18))
+    end
+
+    test "rejects descriptors shorter than the declared length" do
+      assert {:error, :invalid_descriptor} =
+               USB.decode_string_descriptor(<<10, 0x03, 0x41, 0x00>>)
+    end
+
+    test "rejects empty input" do
+      assert {:error, :invalid_descriptor} = USB.decode_string_descriptor(<<>>)
+    end
+  end
+
   describe "strip_status/2" do
     test "returns empty for empty input" do
       assert USB.strip_status(<<>>, 512) == <<>>
