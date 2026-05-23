@@ -56,7 +56,7 @@ defmodule CircuitsFT232H.USB do
 
   @typedoc "An open FT232H USB handle."
   @type t :: %__MODULE__{
-          handle: reference(),
+          handle: :usb.device_handle(),
           bus: 0..255,
           address: 0..255,
           max_packet_size: pos_integer(),
@@ -229,25 +229,36 @@ defmodule CircuitsFT232H.USB do
   def read(%__MODULE__{}, 0, _timeout), do: {:ok, <<>>}
 
   def read(%__MODULE__{} = usb, length, timeout) do
-    raw_length = raw_read_length(length, usb.max_packet_size)
+    deadline = monotonic_ms() + timeout
+    read_loop(usb, length, deadline, [], 0)
+  end
 
-    case :usb.read_bulk(usb.handle, @bulk_in_endpoint, raw_length, timeout) do
-      {:ok, raw} ->
-        payload = strip_status(raw, usb.max_packet_size)
+  defp read_loop(_usb, length, _deadline, acc, acc_size) when acc_size >= length do
+    payload = acc |> Enum.reverse() |> IO.iodata_to_binary()
+    {:ok, binary_part(payload, 0, length)}
+  end
 
-        if byte_size(payload) >= length do
-          {:ok, binary_part(payload, 0, length)}
-        else
-          {:error, {:short_read, byte_size(payload), length}}
-        end
+  defp read_loop(usb, length, deadline, acc, acc_size) do
+    remaining = deadline - monotonic_ms()
 
-      {:error, :timeout, _partial} ->
-        {:error, :timeout}
+    if remaining <= 0 do
+      {:error, {:short_read, acc_size, length}}
+    else
+      case :usb.read_bulk(usb.handle, @bulk_in_endpoint, usb.max_packet_size, remaining) do
+        {:ok, raw} ->
+          payload = strip_status(raw, usb.max_packet_size)
+          read_loop(usb, length, deadline, [payload | acc], acc_size + byte_size(payload))
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, :timeout, _partial} ->
+          {:error, {:short_read, acc_size, length}}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
+
+  defp monotonic_ms, do: System.monotonic_time(:millisecond)
 
   @doc """
   Strips the 2-byte modem-status prefix from every USB packet in `data`.
@@ -350,12 +361,6 @@ defmodule CircuitsFT232H.USB do
   defp packet_size_for_speed(:super), do: @high_speed_packet_size
   defp packet_size_for_speed(:super_plus), do: @high_speed_packet_size
   defp packet_size_for_speed(_other), do: @full_speed_packet_size
-
-  defp raw_read_length(payload_length, packet_size) do
-    payload_per_packet = packet_size - @modem_status_size
-    packets = div(payload_length + payload_per_packet - 1, payload_per_packet)
-    max(packets * packet_size, packet_size)
-  end
 
   defp log_close_error(:ok, _), do: :ok
 

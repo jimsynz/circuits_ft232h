@@ -11,7 +11,7 @@ defmodule CircuitsFT232H.USB.Descriptor do
   defstruct [:device, :bus, :address, port_numbers: [], speed: :unknown]
 
   @type t :: %__MODULE__{
-          device: reference(),
+          device: :usb.device(),
           bus: 0..255,
           address: 0..255,
           port_numbers: [0..255],
