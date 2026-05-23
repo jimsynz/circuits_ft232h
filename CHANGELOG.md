@@ -5,6 +5,17 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [v0.1.1](https://harton.dev/james/circuits_ft232h/compare/v0.1.0...v0.1.1) (2026-05-23)
+
+
+
+
+### Bug Fixes:
+
+* i2c: hold bus-control transitions long enough for setup/hold timing (#2) by James Harton
+
+* each control-line state in those sequences is now emitted by James Harton
+
 ## [v0.1.0](https://harton.dev/james/circuits_ft232h/compare/v0.1.0...v0.1.0) (2026-05-23)
 
 

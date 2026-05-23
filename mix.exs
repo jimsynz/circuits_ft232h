@@ -1,7 +1,7 @@
 defmodule CircuitsFT232H.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @description "Adafruit FT232H breakout board backend for `circuits_i2c` and `circuits_spi`, allowing host-side I2C and SPI development over USB."
 
   def project do
