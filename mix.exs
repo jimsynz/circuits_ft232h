@@ -49,6 +49,7 @@ defmodule CircuitsFT232H.MixProject do
 
   defp deps do
     [
+      {:circuits_gpio, "~> 2.1"},
       {:circuits_i2c, "~> 2.1"},
       {:circuits_spi, "~> 2.0"},
       {:usb, "~> 0.2"},
