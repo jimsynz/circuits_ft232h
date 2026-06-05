@@ -306,4 +306,4 @@ Feel free to raise issues and open PRs on GitHub.
 
 This software is licensed under the terms of the
 [Apache 2.0 license](https://www.apache.org/licenses/LICENSE-2.0). See the
-[`LICENSE`](LICENSE) file in this repository for the full terms.
+[`LICENSE`](https://harton.dev/james/circuits_ft232h/src/branch/main/LICENSE) file in this repository for the full terms.
