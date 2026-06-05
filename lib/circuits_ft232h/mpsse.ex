@@ -346,7 +346,7 @@ defmodule CircuitsFT232H.MPSSE do
     case :binary.match(response, <<@bad_command>>) do
       {pos, _} ->
         case response do
-          <<_::binary-size(pos), @bad_command, offender, _::binary>> ->
+          <<_::binary-size(^pos), @bad_command, offender, _::binary>> ->
             {:bad_command, offender}
 
           _ ->

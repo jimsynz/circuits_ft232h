@@ -291,7 +291,7 @@ defmodule CircuitsFT232H.USB do
   end
 
   defp do_strip(<<_status::binary-size(@modem_status_size), data::binary>>, payload, acc) do
-    <<chunk::binary-size(payload), rest::binary>> = data
+    <<chunk::binary-size(^payload), rest::binary>> = data
     do_strip(rest, payload, [chunk | acc])
   end
 

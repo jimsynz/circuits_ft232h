@@ -428,7 +428,7 @@ defmodule CircuitsFT232H.I2C do
     expected = 1 + write_len + 1 + read_len
 
     case response do
-      <<bin::binary-size(expected)>> ->
+      <<bin::binary-size(^expected)>> ->
         parse_write_read_bytes(bin, write_len, read_len)
 
       _ ->
@@ -437,8 +437,8 @@ defmodule CircuitsFT232H.I2C do
   end
 
   defp parse_write_read_bytes(bin, write_len, read_len) do
-    <<write_addr_ack, write_acks::binary-size(write_len), read_addr_ack,
-      data::binary-size(read_len)>> = bin
+    <<write_addr_ack, write_acks::binary-size(^write_len), read_addr_ack,
+      data::binary-size(^read_len)>> = bin
 
     cond do
       (write_addr_ack &&& @ack_mask) != 0 -> {:error, :i2c_nak}

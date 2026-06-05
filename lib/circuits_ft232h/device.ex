@@ -27,8 +27,6 @@ defmodule CircuitsFT232H.Device do
 
   import Bitwise
 
-  require Logger
-
   @default_latency_ms 16
   @default_timeout 5_000
 
