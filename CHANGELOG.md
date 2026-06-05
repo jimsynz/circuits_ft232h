@@ -5,6 +5,15 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [v0.2.1](https://harton.dev/james/circuits_ft232h/compare/v0.2.0...v0.2.1) (2026-06-05)
+
+
+
+
+### Bug Fixes:
+
+* resolve Elixir 1.20 compiler warnings by James Harton
+
 ## [v0.2.0](https://harton.dev/james/circuits_ft232h/compare/v0.1.1...v0.2.0) (2026-05-23)
 
 
