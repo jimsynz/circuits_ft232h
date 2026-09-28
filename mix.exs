@@ -58,7 +58,7 @@ defmodule CircuitsFT232H.MixProject do
       {:credo, "~> 1.7", only: ~w[dev test]a, runtime: false},
       {:dialyxir, "~> 1.4", only: ~w[dev test]a, runtime: false},
       {:doctor, "~> 0.22", only: ~w[dev test]a, runtime: false},
-      {:ex_check, "~> 0.16", only: ~w[dev test]a, runtime: false},
+      {:ex_check, "~> 0.17", only: ~w[dev test]a, runtime: false},
       {:ex_doc, ">= 0.31.0", only: ~w[dev test]a, runtime: false},
       {:git_ops, "~> 2.6", only: ~w[dev test]a, runtime: false},
       {:mimic, "~> 2.0", only: ~w[dev test]a, runtime: false}
