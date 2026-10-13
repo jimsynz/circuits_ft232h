@@ -5,9 +5,8 @@ defmodule CircuitsFT232H.GPIO.Poller do
   > ### These are NOT hardware interrupts {: .warning}
   >
   > The FT232H has no hardware-generated pin-change notifications. We sample
-  > the pin state on a fixed interval and emit
-  > `{:circuits_gpio, gpio_spec, timestamp, value}` messages when subscribed
-  > pins change in the desired direction.
+  > the pin state on a fixed interval and emit `Circuits.GPIO` change
+  > notifications when subscribed pins change in the desired direction.
   >
   > **Pulses shorter than the poll interval (default 10 ms) will be
   > missed.** Multiple edges within a single interval are collapsed into one
@@ -63,8 +62,15 @@ defmodule CircuitsFT232H.GPIO.Poller do
           trigger: :rising | :falling | :both,
           receiver: pid(),
           suppress_glitches: boolean(),
-          last_value: 0..1
+          last_value: 0..1,
+          notification: notification()
         }
+
+  @typedoc """
+  Which `Circuits.GPIO` message format a subscription receives: the
+  `set_interrupts/3` tuple, or the `subscribe/2` map carrying the tag.
+  """
+  @type notification :: :interrupt | {:subscription, tag :: term()}
 
   @typedoc "Poller GenServer state."
   @type t :: %__MODULE__{
@@ -85,8 +91,12 @@ defmodule CircuitsFT232H.GPIO.Poller do
 
   Options:
     * `:receiver` (default the calling process) — the pid (or registered
-      name) that will receive `{:circuits_gpio, gpio_spec, timestamp, value}`
-      messages.
+      name) that will receive the notifications.
+    * `:tag` — when given, notifications use the `Circuits.GPIO.subscribe/2`
+      format, `{:circuits_gpio, %{ref: tag, timestamp: timestamp, value:
+      value, previous_value: previous_value}}`. Without it they use the
+      `Circuits.GPIO.set_interrupts/3` format,
+      `{:circuits_gpio, gpio_spec, timestamp, value}`.
     * `:suppress_glitches` (default `true`) — accepted but currently a
       no-op; see the moduledoc.
   """
@@ -98,7 +108,8 @@ defmodule CircuitsFT232H.GPIO.Poller do
       caller = self()
       receiver = resolve_receiver(Keyword.get(opts, :receiver, caller))
       suppress = Keyword.get(opts, :suppress_glitches, true)
-      GenServer.call(pid, {:subscribe, pin, trigger, receiver, suppress})
+      notification = notification(opts)
+      GenServer.call(pid, {:subscribe, pin, trigger, receiver, suppress, notification})
     end
   end
 
@@ -177,6 +188,13 @@ defmodule CircuitsFT232H.GPIO.Poller do
 
   defp via(device_id), do: {:via, Registry, {CircuitsFT232H.Registry, {:poller, device_id}}}
 
+  defp notification(opts) do
+    case Keyword.fetch(opts, :tag) do
+      {:ok, tag} -> {:subscription, tag}
+      :error -> :interrupt
+    end
+  end
+
   defp resolve_receiver(receiver) when is_pid(receiver), do: receiver
 
   defp resolve_receiver(receiver) when is_atom(receiver),
@@ -199,14 +217,15 @@ defmodule CircuitsFT232H.GPIO.Poller do
   end
 
   @impl true
-  def handle_call({:subscribe, pin, trigger, receiver, suppress}, _from, state) do
+  def handle_call({:subscribe, pin, trigger, receiver, suppress, notification}, _from, state) do
     case sample_pin(state.device_id, pin) do
       {:ok, value} when value in 0..1 ->
         subscription = %{
           trigger: trigger,
           receiver: receiver,
           suppress_glitches: suppress,
-          last_value: value
+          last_value: value,
+          notification: notification
         }
 
         new_subs = Map.put(state.subscriptions, pin, subscription)
@@ -316,13 +335,19 @@ defmodule CircuitsFT232H.GPIO.Poller do
     edge = if new_value == 1, do: :rising, else: :falling
 
     if matches_trigger?(sub.trigger, edge) do
-      send(
-        sub.receiver,
-        {:circuits_gpio, gpio_spec_for(state.device_id, pin), timestamp, new_value}
-      )
+      send(sub.receiver, message(sub, state.device_id, pin, timestamp, new_value))
     end
 
     put_in(state.subscriptions[pin].last_value, new_value)
+  end
+
+  defp message(%{notification: :interrupt}, device_id, pin, timestamp, value) do
+    {:circuits_gpio, gpio_spec_for(device_id, pin), timestamp, value}
+  end
+
+  defp message(%{notification: {:subscription, tag}} = sub, _device_id, _pin, timestamp, value) do
+    {:circuits_gpio,
+     %{ref: tag, timestamp: timestamp, value: value, previous_value: sub.last_value}}
   end
 
   defp matches_trigger?(:both, _), do: true

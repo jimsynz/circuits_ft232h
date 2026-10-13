@@ -104,6 +104,30 @@ defmodule CircuitsFT232H.GPIO.PollerTest do
 
       :ok = Handle.close(handle)
     end
+
+    test "subscribe/2 events carry the ref and previous value" do
+      {:ok, handle} = Backend.open("AD4", :output, initial_value: 0)
+      {:ok, ref} = Handle.subscribe(handle, [])
+
+      toggle_with_settle(handle, [1, 0])
+
+      assert_receive {:circuits_gpio, %{ref: ^ref, value: 1, previous_value: 0}}, 500
+      assert_receive {:circuits_gpio, %{ref: ^ref, value: 0, previous_value: 1}}, 500
+
+      :ok = Handle.unsubscribe(handle)
+      :ok = Handle.close(handle)
+    end
+
+    test "subscribe/2 echoes a caller-supplied tag" do
+      {:ok, handle} = Backend.open("AD4", :output, initial_value: 0)
+      assert {:ok, :my_tag} = Handle.subscribe(handle, tag: :my_tag, trigger: :rising)
+
+      toggle_with_settle(handle, [1])
+
+      assert_receive {:circuits_gpio, %{ref: :my_tag, value: 1}}, 500
+
+      :ok = Handle.close(handle)
+    end
   end
 
   describe "receiver lifecycle" do

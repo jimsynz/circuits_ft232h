@@ -204,13 +204,18 @@ Pull modes:
 - `:pulldown` and `:none` return `{:error, :not_supported}` — neither is
   controllable at runtime.
 
+Drive modes:
+
+- `:push_pull` is the only drive mode. `:open_drain` and `:open_source`
+  return `{:error, :not_supported}`.
+
 #### GPIO interrupts are emulated
 
-`Circuits.GPIO.set_interrupts/3` is supported, but **be aware that the
-FT232H has no hardware-generated pin-change notifications**. We emulate
-interrupts by sampling pin state on a fixed interval — by default every
-10 ms — and emitting `{:circuits_gpio, gpio_spec, timestamp, value}`
-messages on edges.
+`Circuits.GPIO.subscribe/2` and `Circuits.GPIO.set_interrupts/3` are
+supported, but **be aware that the FT232H has no hardware-generated
+pin-change notifications**. We emulate interrupts by sampling pin state on
+a fixed interval — by default every 10 ms — and emitting the usual
+`Circuits.GPIO` change notifications on edges.
 
 **Pulses shorter than the poll interval will be missed.** Multiple edges
 within a single interval are collapsed into one notification with the final

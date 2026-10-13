@@ -94,6 +94,44 @@ defmodule CircuitsFT232H.GPIO.BackendTest do
     end
   end
 
+  describe "drive modes" do
+    test "accepts :push_pull" do
+      {:ok, handle} = Backend.open("AD7", :output, drive_mode: :push_pull)
+      assert :ok = Circuits.GPIO.Handle.set_drive_mode(handle, :push_pull)
+      :ok = Circuits.GPIO.Handle.close(handle)
+    end
+
+    test "rejects :open_drain and :open_source" do
+      assert {:error, :not_supported} = Backend.open("AD7", :output, drive_mode: :open_drain)
+
+      {:ok, handle} = Backend.open("AD7", :output, [])
+      assert {:error, :not_supported} = Circuits.GPIO.Handle.set_drive_mode(handle, :open_drain)
+      assert {:error, :not_supported} = Circuits.GPIO.Handle.set_drive_mode(handle, :open_source)
+      :ok = Circuits.GPIO.Handle.close(handle)
+    end
+  end
+
+  describe "status" do
+    test "reports the direction of an open handle" do
+      {:ok, handle} = Backend.open("AD7", :output, [])
+
+      assert {:ok, %{direction: :output, drive_mode: :push_pull}} =
+               Circuits.GPIO.Handle.status(handle)
+
+      :ok = Circuits.GPIO.Handle.close(handle)
+    end
+  end
+
+  describe "force_close/2" do
+    test "frees a pin so it can be reopened" do
+      {:ok, _lost_handle} = Backend.open("AD7", :output, [])
+      assert :ok = Backend.force_close("AD7", [])
+
+      {:ok, handle} = Backend.open("AD7", :input, [])
+      :ok = Circuits.GPIO.Handle.close(handle)
+    end
+  end
+
   describe "interrupts" do
     test "set_interrupts/3 subscribes via the Poller and returns :ok" do
       {:ok, handle} = Backend.open("AC0", :input, [])

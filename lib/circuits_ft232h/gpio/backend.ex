@@ -16,9 +16,13 @@ defmodule CircuitsFT232H.GPIO.Backend do
   active protocol fail with `{:error, {:pin_reserved_by_protocol, mode, pin}}`
   if you try to open them as GPIO.
 
+  Pins are always driven push-pull, so the `:open_drain` and `:open_source`
+  drive modes return `{:error, :not_supported}`.
+
   ## Interrupts are emulated by polling
 
-  `Circuits.GPIO.set_interrupts/3` is supported via a per-chip polling
+  `Circuits.GPIO.subscribe/2` and `Circuits.GPIO.set_interrupts/3` are
+  supported via a per-chip polling
   GenServer (`CircuitsFT232H.GPIO.Poller`) that samples pin state at a
   fixed interval — **the FT232H has no hardware pin-change notifications,
   so pulses shorter than the poll interval will be missed.** Default
@@ -32,7 +36,7 @@ defmodule CircuitsFT232H.GPIO.Backend do
   @behaviour Circuits.GPIO.Backend
 
   alias CircuitsFT232H.{Device, GPIO}
-  alias CircuitsFT232H.GPIO.Handle
+  alias CircuitsFT232H.GPIO.{Handle, Poller}
 
   @impl true
   def enumerate(_options) do
@@ -56,13 +60,14 @@ defmodule CircuitsFT232H.GPIO.Backend do
           {:error, _} -> :input
         end
 
-      {:ok, %{consumer: "", direction: direction, pull_mode: :pullup}}
+      {:ok, %{consumer: "", direction: direction, pull_mode: :pullup, drive_mode: :push_pull}}
     end
   end
 
   @impl true
   def open(gpio_spec, direction, options) when direction in [:input, :output] do
-    with {:ok, pin_ref} <- GPIO.resolve(gpio_spec),
+    with :ok <- check_drive_mode(Keyword.get(options, :drive_mode, :push_pull)),
+         {:ok, pin_ref} <- GPIO.resolve(gpio_spec),
          {:ok, descriptor} <- GPIO.find_descriptor(pin_ref.controller),
          {:ok, _pid} <- Device.find_or_start(descriptor),
          initial = initial_value(options),
@@ -78,7 +83,24 @@ defmodule CircuitsFT232H.GPIO.Backend do
   end
 
   @impl true
+  def force_close(gpio_spec, _options) do
+    with {:ok, pin_ref} <- GPIO.resolve(gpio_spec) do
+      case Device.whereis(pin_ref.controller) do
+        {:ok, _pid} ->
+          _ = Poller.unsubscribe(pin_ref.controller, pin_ref.pin)
+          Device.release_gpio_pin(pin_ref.controller, pin_ref.pin)
+
+        {:error, :not_started} ->
+          :ok
+      end
+    end
+  end
+
+  @impl true
   def backend_info, do: %{backend: __MODULE__, name: "circuits_ft232h"}
+
+  defp check_drive_mode(:push_pull), do: :ok
+  defp check_drive_mode(_mode), do: {:error, :not_supported}
 
   defp initial_value(options) do
     case Keyword.get(options, :initial_value, 0) do

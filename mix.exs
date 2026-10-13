@@ -50,7 +50,7 @@ defmodule CircuitsFT232H.MixProject do
 
   defp deps do
     [
-      {:circuits_gpio, "~> 2.1"},
+      {:circuits_gpio, "~> 2.3"},
       {:circuits_i2c, "~> 2.1"},
       {:circuits_spi, "~> 2.0"},
       {:igniter, "~> 0.8", optional: true},

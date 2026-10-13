@@ -21,6 +21,7 @@ defmodule CircuitsFT232H.GPIO.Handle do
 
   defimpl Circuits.GPIO.Handle do
     alias CircuitsFT232H.Device
+    alias CircuitsFT232H.GPIO.{Backend, Poller}
 
     def read(%{controller: id, pin: pin}) do
       case Device.read_gpio_pin(id, pin) do
@@ -28,6 +29,8 @@ defmodule CircuitsFT232H.GPIO.Handle do
         _ -> 0
       end
     end
+
+    def status(%{controller: id, pin: pin}), do: Backend.status({id, pin}, [])
 
     def write(%{controller: id, pin: pin}, value) when value in 0..1 do
       _ = Device.write_gpio_pin(id, pin, value)
@@ -48,18 +51,32 @@ defmodule CircuitsFT232H.GPIO.Handle do
 
     def set_pull_mode(_handle, _mode), do: {:error, :not_supported}
 
+    def set_drive_mode(_handle, :push_pull), do: :ok
+    def set_drive_mode(_handle, _mode), do: {:error, :not_supported}
+
     def close(%{controller: id, pin: pin}) do
-      _ = CircuitsFT232H.GPIO.Poller.unsubscribe(id, pin)
+      _ = Poller.unsubscribe(id, pin)
       Device.release_gpio_pin(id, pin)
     end
 
     def set_interrupts(%{controller: id, pin: pin}, :none, _opts) do
-      CircuitsFT232H.GPIO.Poller.unsubscribe(id, pin)
+      Poller.unsubscribe(id, pin)
     end
 
     def set_interrupts(%{controller: id, pin: pin}, trigger, opts)
         when trigger in [:rising, :falling, :both] do
-      CircuitsFT232H.GPIO.Poller.subscribe(id, pin, trigger, opts)
+      Poller.subscribe(id, pin, trigger, opts)
     end
+
+    def subscribe(handle, opts) do
+      tag = Keyword.get(opts, :tag) || make_ref()
+      trigger = Keyword.get(opts, :trigger) || :both
+
+      with :ok <- set_interrupts(handle, trigger, Keyword.put(opts, :tag, tag)) do
+        {:ok, tag}
+      end
+    end
+
+    def unsubscribe(%{controller: id, pin: pin}), do: Poller.unsubscribe(id, pin)
   end
 end
