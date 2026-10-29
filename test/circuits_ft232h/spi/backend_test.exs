@@ -63,6 +63,23 @@ defmodule CircuitsFT232H.SPI.BackendTest do
     :ok = Circuits.SPI.close(bus)
   end
 
+  test "write/2 accepts iodata and discards the received bytes", %{bus_name: name} do
+    {:ok, bus} = Backend.open(name, mode: 0, speed_hz: 1_000_000)
+
+    assert :ok = Circuits.SPI.write(bus, [0xA5, <<0x5A, 0xFF>>])
+
+    :ok = Circuits.SPI.close(bus)
+  end
+
+  test "read/2 clocks out zeros and returns what comes back on the loopback",
+       %{bus_name: name} do
+    {:ok, bus} = Backend.open(name, mode: 0, speed_hz: 1_000_000)
+
+    assert {:ok, <<0, 0, 0, 0>>} = Circuits.SPI.read(bus, 4)
+
+    :ok = Circuits.SPI.close(bus)
+  end
+
   test "open + close + open again works (mode lock releases cleanly)", %{bus_name: name} do
     {:ok, bus1} = Backend.open(name, [])
     :ok = Circuits.SPI.close(bus1)

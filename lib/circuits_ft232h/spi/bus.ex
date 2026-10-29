@@ -24,6 +24,14 @@ defmodule CircuitsFT232H.SPI.Bus do
       SPI.transfer(id, config, data)
     end
 
+    def write(bus, data) do
+      with {:ok, _received} <- transfer(bus, IO.iodata_to_binary(data)), do: :ok
+    end
+
+    def read(bus, len) when is_integer(len) and len > 0 do
+      transfer(bus, :binary.copy(<<0>>, len))
+    end
+
     def close(%{id: id, config: config}), do: SPI.close(id, config)
 
     def max_transfer_size(_bus), do: SPI.max_transfer_size()
